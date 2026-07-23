@@ -1,6 +1,7 @@
 #ifndef SHARPVOX_H
 #define SHARPVOX_H
 
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -56,8 +57,6 @@ public:
     bool KlattschMode = false;
     float KlBaseF0 = 120.0f;
     float KlRate = 110.0f;
-    float KlVibrato = 0.0f;
-    float KlVibRate = 5.0f;
     float KlAsp = 0.0f;
     float KlTilt = 0.0f;
     float KlEffort = 0.5f;
@@ -86,6 +85,28 @@ public:
 
     int32_t GetTremoloRate() const { return _tremoloRate; }
     void SetTremoloRate(int32_t v) { _tremoloRate = v; MarkCustom(); }
+
+    // Voice vibrato default; seeds both core and klattsch synth vibrato per speak.
+    // Depth1/Depth2 are the alternating half-cycle depths; the plain depth
+    // accessor reads depth1 and writes both for symmetric vibrato.
+    int32_t GetVibratoDepth() const { return _vibratoDepth1; }
+    void SetVibratoDepth(int32_t v) { _vibratoDepth1 = v; _vibratoDepth2 = v; MarkCustom(); }
+
+    int32_t GetVibratoDepth1() const { return _vibratoDepth1; }
+    void SetVibratoDepth1(int32_t v) { _vibratoDepth1 = v; MarkCustom(); }
+
+    int32_t GetVibratoDepth2() const { return _vibratoDepth2; }
+    void SetVibratoDepth2(int32_t v) { _vibratoDepth2 = v; MarkCustom(); }
+
+    int32_t GetVibratoRate() const { return _vibratoRate; }
+    void SetVibratoRate(int32_t v) { _vibratoRate = v; MarkCustom(); }
+
+    // Core vibrato depth is 0.128*raw pitch-units peak (256 units/octave, log).
+    // Klattsch synth vibrato is additive Hz, so convert at the base F0 to match.
+    float VibratoDepthToKlattschHz() const {
+        double peakUnits = 0.128 * (double)_vibratoDepth1;
+        return (float)(KlBaseF0 * (std::pow(2.0, peakUnits / 256.0) - 1.0));
+    }
 
     // Glottal source
     int32_t GetJitter() const { return _jitter; }
@@ -245,6 +266,9 @@ private:
     int32_t _aspirationCycle = 192;
     int32_t _tremoloDepth = 0;
     int32_t _tremoloRate = 0;
+    int32_t _vibratoDepth1 = 14;
+    int32_t _vibratoDepth2 = 16;
+    int32_t _vibratoRate = 65;
 
     // Glottal source
     int32_t _jitter = 0;
