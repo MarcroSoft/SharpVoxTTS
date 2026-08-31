@@ -201,6 +201,12 @@ namespace SharpVox {
         // (phoneme intrinsic durations compress less than fixed additions at extreme speeds).
         int64_t denominator = (((_speechRate - kNormal_Speech_Rate) * (int64_t)(k1pct * 60)) >> 16) + kNormal_Speech_Rate;
         _rateRatioLowGain = ((int64_t)kNormal_Speech_Rate << 16) / denominator;
+        // Blend the compressed core ratio toward the linear ratio at high rates so
+        // segment cores stop lagging the tempo (Janse et al. 2003).
+        int32_t linFrac = RateLin::FracQ16(_speechRate);
+        if (linFrac != 0) {
+            _rateRatioLowGain += ((_rateRatio - _rateRatioLowGain) * linFrac) >> 16;
+        }
         _stressDuration = (int16_t)((_rateRatio * _stressDurTime) >> 16);
     }
 
@@ -921,8 +927,9 @@ namespace SharpVox {
 
             // EL rule: AX/UH + L -> EL (syllabic L) in unstressed non-word-initial position.
             // "bottle" AX L -> EL; "petal" UH L -> EL.
+            // skip when L is followed by a vowel
             if (!isSinging && curPhon == _L_ && (curCtrl & (kPrimOrEmphStress | kWord_Initial_Consonant)) == 0) {
-                if (prevPhon == _AX_ || prevPhon == _UH_) {
+                if ((prevPhon == _AX_ || prevPhon == _UH_) && (nextFlags & kVowelF) == 0) {
                     _phonBuf2[_phonBuf2InIndex - 1] = _EL_;
                     delFwd = true;
                     goto STUFF_BUFF;
@@ -1517,6 +1524,12 @@ namespace SharpVox {
                 d /= kFrameTime;
                 if (curPhon != _SIL_ && d < 8 / kFrameTime) {
                     d = 1;
+                }
+                // Per-class floor after rate scaling: keep sonorant consonants above
+                // one frame so their formant target still registers at extreme rate.
+                // Stops and bursts are meant to stay brief and are left alone.
+                if ((curFlags & kSonorConsonF) != 0 && d < kMinSonorantFrames) {
+                    d = kMinSonorantFrames;
                 }
                 _durBuf[i] = (int16_t)std::max(d, (int32_t)1);
             }
