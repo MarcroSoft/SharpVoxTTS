@@ -1033,11 +1033,10 @@ namespace SharpVox {
                 delFwd = true;
             }
 
-            // DHAH -> DHIY rule: "the" before a stressed vowel is pronounced "thee" not "thuh".
-            if ((nextFlags & kVowelF) != 0 && curPhon == _AH_ &&
-                (curCtrl & kSyllableTypeField) != 0 && prevPhon == _DH_ &&
-                (prevCtrl & kWord_Initial_Consonant) != 0 &&
-                (nextCtrl & kPrimOrEmphStress) != 0) {
+            // DHAH -> DHIY rule, "the" before a vowel is said as "thee", but before a consonant is "thuh"
+            if ((nextFlags & kVowelF) != 0 && (curPhon == _AH_ || curPhon == _AX_) &&
+                (curCtrl & kSyllableTypeField) >= kWord_End && prevPhon == _DH_ &&
+                (prevCtrl & kWord_Initial_Consonant) != 0) {
                 targetPhon = _IY_;
             }
 
