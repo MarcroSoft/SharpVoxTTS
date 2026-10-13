@@ -645,6 +645,15 @@ int16_t SpeechRenderer::GetTargetRaw(int32_t index) {
     } else if (bt == kSourceAmpType) {
         if (_curBlockIndex == kAV) {
             tv = Tables::GetAmplitudeVoicing(_male, cur);
+            // nasal murmur sits well below the vowels. the
+            // pause final nasals ("-ing.") hold their target level for their whole length, so they take a lighter cut, as does syllabic EN.
+            if ((ctrl & kJapaneseMora) == 0) {
+                if (cur >= _M_ && cur <= _NG_) {
+                    tv -= (next == _SIL_) ? kFinalNasalVoicingCut : kNasalVoicingCut;
+                } else if (cur == _EN_) {
+                    tv -= kSyllabicNasalVoicingCut;
+                }
+            }
             if ((ctrl & kPlosive_Release) != 0) {
                 tv -= (int16_t)(((pf & kNasalF) != 0) ? 6 : 20);
             }

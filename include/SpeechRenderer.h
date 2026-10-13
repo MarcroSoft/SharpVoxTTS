@@ -31,6 +31,11 @@ public:
     static constexpr int32_t kAp2 = 9; static constexpr int32_t kAp3 = 10; static constexpr int32_t kAp4 = 11;
     static constexpr int32_t kAp5 = 12; static constexpr int32_t kAp6 = 13; static constexpr int32_t kAB = 14;
 
+    // Voicing table cut for nasal murmur (table units, ~0.5 dB each) so nasals dip below neighbouring vowels, pause-final nasals and syllabic EN take a lighter cut.
+    static constexpr int16_t kNasalVoicingCut = 16;
+    static constexpr int16_t kFinalNasalVoicingCut = 8;
+    static constexpr int16_t kSyllabicNasalVoicingCut = 10;
+
     // Block type constants (match Tables.ControlBlockTypeTable)
     static constexpr int32_t kFreqType = 0;    static constexpr int32_t kBWType = 1;
     static constexpr int32_t kFNZType = 2;     static constexpr int32_t kSourceAmpType = 3;

@@ -1251,6 +1251,23 @@ namespace SharpVox {
         }
     }
 
+    // Per-class duration balance applied on top of the Klatt/Hertz rules.
+    static double DurationClassScale(int16_t phon, bool stressed, int16_t nextPhon) {
+        if (phon == _IX_ || phon == _AX_ || phon == _EL_ || phon == _EN_) return 0.79;  // reduced / syllabic
+        if (phon >= _IY_ && phon <= _YU_)  return stressed ? 0.72 : 0.67;  // full vowels
+        if (phon >= _IR_ && phon <= _UR_)  return 1.0;                     // r-colored vowels
+        if (phon >= _M_ && phon <= _NG_)   return 1.17;                    // nasals
+        if (phon >= _W_ && phon <= _LX_)   return 1.36;                    // liquids / glides
+        if (phon >= _F_ && phon <= _HH_)   return 1.36;                    // fricatives
+        if ((phon >= _P_ && phon <= _G_) || phon == _TX_ || phon == _DD_) {          // stops
+            bool stopNext = (nextPhon >= _P_ && nextPhon <= _JH_) || nextPhon == _TX_ || nextPhon == _DD_;
+            return stopNext ? 1.0 : 1.25;
+        }
+        if (phon == _CH_ || phon == _JH_)  return 0.75;                    // affricates
+        if (phon == _DX_)                  return 1.44;                    // flap
+        return 1.0;
+    }
+
     // Duration model combines Klatt (1976) and Hertz (1982) rules for boundaries, stress, and clusters.
 
     void AudioProcessor::ModDuration() {
@@ -1577,6 +1594,9 @@ namespace SharpVox {
                     fixedDur = (int32_t)((fixedDur * _rateRatio) >> 16);
                 }
                 durHold += fixedDur;
+                if ((curCtrl & kJapaneseMora) == 0) {
+                    durHold = (int32_t)(durHold * DurationClassScale(curPhon, (curStress & kPrimOrEmphStress) != 0, nextPhon) + 0.5);
+                }
 
                 int32_t d = (durHold * _userDurBuf2[i]) >> kDurStepRes;
                 d /= kFrameTime;
