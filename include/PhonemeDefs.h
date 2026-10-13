@@ -107,6 +107,8 @@ namespace SharpVox {
     constexpr int64_t kStressedWInitial               = kIsStressed | kWord_Initial_Consonant;
     constexpr int64_t kSampleMarker                   = 0x02000000L;
     constexpr int64_t kJapaneseMora                   = 0x100000000LL;
+    // content word that is usually left unaccented or weakly accented like light verbs, quantifiers, degree adverbs, set on every phoneme
+    constexpr int64_t kLightContent                   = 0x200000000LL;
     constexpr int64_t kPlosive_Release                = 0x4000;
 
     // BND types for silence, index into BoundaryDurationTable

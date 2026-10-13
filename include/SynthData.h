@@ -122,6 +122,8 @@ namespace SharpVox {
         int32_t FujisakiMonoAccentDurScalePct;
         int64_t FujisakiCompoundStepQ16;
         int32_t FujisakiFinalDropPct;
+        // index of this clause within the sentence (0 = sentence-initial)
+        int16_t ClauseInSentence = 0;
 
         int64_t VibratoDepth1;
         int64_t VibratoDepth2;

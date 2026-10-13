@@ -128,6 +128,9 @@ namespace SharpVox {
         int32_t _clauseFrame;
         int32_t _phraseFireFrame;  // clause frame of the last phrase command fire
 
+        // Continuation-clause level offset (pitch units, pre-scaling)
+        int32_t _clauseLevel;
+
         // Voiced-frame mean offset, precomputed in BuildFujiProsody; subtracted
         // before Intonation/PitchRange scaling so PitchHz is the clause average.
         int32_t _fujiMeanOffset;
@@ -152,14 +155,28 @@ namespace SharpVox {
         static constexpr int32_t kFrameTime = 5;
         static constexpr int32_t pct = 655;
         static constexpr int32_t k100percent = 0x10000;
-        // Accent pulse length window: short pulses never reach the filter's
-        // amplitude, and the tail past the vowel links accents together.
-        static constexpr int32_t kMinAccentPulseFrames = 25;
-        static constexpr int32_t kMaxAccentPulseFrames = 60;
+        // accent pulse length window. Japanese keeps the original window, which links mora accents together
+        static constexpr int32_t kMinAccentPulseFrames = 9;
+        static constexpr int32_t kMaxAccentPulseFrames = 52;
+        static constexpr int32_t kJapaneseMinPulseFrames = 25;
+        static constexpr int32_t kJapaneseMaxPulseFrames = 60;
+        static constexpr double  kNuclearPulseScale = 1.15;
 
-        // Clause-start de-accenting: scale early accents by (1 - scale*humpFrac)
-        // where humpFrac tracks the phrase hump, so the first word doesn't stack
-        // phrase lift + accent into a near-octave spike.
+        // phrase filter rise time, 65 frames = 325 ms (alpha ~3.1/s), in the range fitted to English read speech, the TGSpeechBox default of 39 frames made the phrase hump peak and decay too early.
+        static constexpr int32_t kPhraseLenFrames = 65;
+
+        // head accent scales for light content words and single syllable words.
+        static constexpr double kLightContentAccentScale = 0.7;
+        static constexpr double kMonosyllableAccentScale = 0.8;
+
+        // yes/no question nuclear accent scale
+        static constexpr double kQuestionNuclearScale = 0.4;
+
+        // level drop per continuation clause (after a comma), pitch units ~1.1 semitones at the default range, capped at two clauses.
+        static constexpr int32_t kContinuationClauseLevel = -24;
+
+        // clause start deaccenting, scale early accents by (1 - scale*humpFrac) where humpFrac tracks the phrase hump, so the first word doesn't stack
+        // phrase lift + accent into a near octave spike.
         static constexpr double kPhraseStartAccentScale = 0.70;
         static constexpr int32_t kPhraseHumpFrames = 2 * FujisakiPitchModel::kDefaultPhraseLenFrames;  // 78 = ~390 ms
 
@@ -188,6 +205,8 @@ namespace SharpVox {
         // Precomputes per-word vowel data, the last-vowel window, and the
         // clause mean offset by replaying the intonation profile.
         void BuildFujiProsody();
+
+        void FirePhraseCommand();
 
         void Interpolate_Pitch();
     };

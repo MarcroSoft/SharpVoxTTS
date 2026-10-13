@@ -90,6 +90,17 @@ namespace SharpVox {
         static constexpr int32_t kHZ_25 = 649 - kNormalPitch;  // 70
         static constexpr int32_t kHZ_28 = 656 - kNormalPitch;  // 77
 
+        // accent and boundary tone placement,  Onsets are frames relative to the vowel start
+        // accent commands lead the stressed vowel by 15-20 ms
+        static constexpr int16_t kHeadAccentOnset    = -3;
+        static constexpr int16_t kNuclearAccentOnset = -4;
+        // boundary tone targets in pitch units, yes/no question rise
+        // start end and comma continuation rise.
+        static constexpr int16_t kQuestRiseStart = 39;
+        static constexpr int16_t kQuestRiseEnd   = 85;
+        static constexpr int16_t kContRiseStart  = 20;
+        static constexpr int16_t kContRiseEnd    = 57;
+
         // Working buffers  sized per-call to actual clause length in Process().
         // Buf1: raw phoneme stream from the front-end (LoadPhonemes).
         // Buf2: allophone-transformed stream (FillPhonBuf2).  Allocated at 2 buf1
@@ -180,6 +191,10 @@ namespace SharpVox {
         bool     _isCompoundNoun;
         int16_t  _endPunctuation;
         bool     _singing;
+        // clauses already spoken in the current sentence
+        // 0 for a sentence initial clause
+        int16_t  _clauseInSentence = 0;
+        int16_t  _prevEndPunctuation = _Period_;
 
         // Rate params
         int64_t  _rateRatio;

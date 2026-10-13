@@ -154,6 +154,13 @@ namespace SharpVox {
                                            int16_t endPunctuation) {
         _endPunctuation = endPunctuation;
         _singing = false;
+        // a clause continues the sentence when the previous one ended on a comma or break
+        if (_prevEndPunctuation == _Comma_ || _prevEndPunctuation == 0) {
+            if (_clauseInSentence < 16) _clauseInSentence++;
+        } else {
+            _clauseInSentence = 0;
+        }
+        _prevEndPunctuation = endPunctuation;
 
         ClearBuffers((int32_t)tokens.size());
         InitRateParams();
@@ -385,6 +392,7 @@ namespace SharpVox {
         pitch.FujisakiMonoAccentDurScalePct  = _vpFujiMonoAccentDurScalePct;
         pitch.FujisakiCompoundStepQ16        = _vpFujiCompoundStep;
         pitch.FujisakiFinalDropPct           = _vpFujiFinalDropPct;
+        pitch.ClauseInSentence               = _clauseInSentence;
 
         pitch.VibratoDepth1      = _vibratoDepth1;
         pitch.VibratoDepth2      = _vibratoDepth2;
@@ -1020,7 +1028,8 @@ namespace SharpVox {
                 (curCtrl & kSyllableTypeField) >= kWord_End &&
                 (curCtrl & kPrimOrEmphStress) == 0) {
                 _phonBuf2[_phonBuf2InIndex - 1] = _YU_;
-                _phonCtrlBuf2[_phonBuf2InIndex - 1] = curCtrl;
+                //keep the Y word boundary so "you" stays as its own word
+                _phonCtrlBuf2[_phonBuf2InIndex - 1] = curCtrl | (prevCtrl & kBoundryTypeField);
                 delFwd = true;
             }
 
@@ -1927,13 +1936,9 @@ namespace SharpVox {
                     }
                     // Peak-targeting hat: amp 3p/2 with tilt +21 decomposes to an
                     // absolute peak of ~p and a landing plateau of ~p/2 (MITalk 2:1).
-                    StoreTiltEvent((int16_t)(peak1 * 3 / 2), +21, curDur, 0, kPitchRiseFall1_Flg);
+                    StoreTiltEvent((int16_t)(peak1 * 3 / 2), +21, curDur, kHeadAccentOnset, kPitchRiseFall1_Flg);
                 } else if ((curCtrl & kPitchFall1) != 0) {
-                    int16_t fallAmt1 = _vpFallAmt1;
-                    int16_t dRise1 = (int16_t)(curDur * (64 - 51) / 128);
-                    int16_t timeT1 = (int16_t)((40 / kFrameTime) - dRise1);
-                    if (timeT1 < 0) timeT1 = (int16_t)0;
-                    StoreTiltEvent(fallAmt1, -51, curDur, timeT1, kPitchRiseFall1_Flg);
+                    StoreTiltEvent(_vpFallAmt1, -51, curDur, kHeadAccentOnset, kPitchRiseFall1_Flg);
                 }
 
                 // STRESS ACCENT (emphatic only)
@@ -2020,10 +2025,7 @@ namespace SharpVox {
                             // aRise + aFall = amp; solve for aRise = peak, landing = -floorDepth.
                             int16_t amp = (int16_t)(2 * nucPeak + floorDepth);
                             int16_t nucTilt = (int16_t)(0 - (64 * floorDepth) / amp);
-                            int16_t dRise = (int16_t)(curDur * (64 + nucTilt) / 128);
-                            int16_t timeT = (int16_t)((40 / kFrameTime) - dRise);
-                            if (timeT < 0) timeT = (int16_t)0;
-                            StoreTiltEvent(amp, nucTilt, curDur, timeT, kPitchRiseFall_Flg);
+                            StoreTiltEvent(amp, nucTilt, curDur, kNuclearAccentOnset, kPitchRiseFall_Flg);
                         }
                         fallAmt = (int16_t)(0 - floorDepth);
                     }
@@ -2051,15 +2053,16 @@ namespace SharpVox {
                 if ((curSylType & kTerm_End) != 0 &&
                     (_endPunctuation == _Comma_ || _endPunctuation == _Quest_ || _endPunctuation == _Tilde_)) {
                     if (_endPunctuation == _Quest_) {
-                        StoreTiltEvent(kHZ_18, 0, 0, 0, kPitchBoundry_Flg);
-                        StoreTiltEvent(kHZ_25, 0, 0, curDur, kPitchBoundry_Flg);
+                        // low start, then the rise lands at 3/4 of the final vowel so it is heard on voicing rather than on a trailing voiceless consonant
+                        StoreTiltEvent(kQuestRiseStart, 0, 0, 0, kPitchBoundry_Flg);
+                        StoreTiltEvent(kQuestRiseEnd, 0, 0, (int16_t)(curDur * 3 / 4), kPitchBoundry_Flg);
                     } else if (_endPunctuation == _Tilde_) {
                         StoreTiltEvent(kHZ_7, 0, 0, 0, kPitchBoundry_Flg);
                         StoreTiltEvent(kHZ_18, 0, 0, (int16_t)(curDur * 2 / 5), kPitchBoundry_Flg);
                         StoreTiltEvent(kHZ_4, 0, 0, curDur, kPitchBoundry_Flg);
                     } else {
-                        StoreTiltEvent(kHZ_10, 0, 0, 0, kPitchBoundry_Flg);
-                        StoreTiltEvent(kHZ_20, 0, 0, curDur, kPitchBoundry_Flg);
+                        StoreTiltEvent(kContRiseStart, 0, 0, 0, kPitchBoundry_Flg);
+                        StoreTiltEvent(kContRiseEnd, 0, 0, curDur, kPitchBoundry_Flg);
                     }
                 }
             }

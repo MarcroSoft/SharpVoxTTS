@@ -73,6 +73,52 @@ namespace SharpVox {
         return false;
     }
 
+    // content words that readers usually leave unaccented or accent weakly light verbs quantifiers and degree adverbs
+    static const char* const LightContentWordsTableArr[] = {
+        // light verbs
+        "go", "goes", "went", "gone", "going",
+        "get", "gets", "got", "getting", "gotten",
+        "make", "makes", "made", "making",
+        "take", "takes", "took", "taken", "taking",
+        "come", "comes", "came", "coming",
+        "give", "gives", "gave", "given",
+        "put", "puts", "keep", "keeps", "kept", "let", "lets",
+        // quantifiers / degree and focus adverbs
+        "all", "only", "just", "also", "even", "very", "really", "quite",
+        "rather", "almost", "enough", "still", "much", "many", "more",
+        "most", "some", "any", "each", "every", "both", "such", "own",
+        "this", "these", "those",
+    };
+
+    static bool IsLightContentWord(const std::string& w) {
+        for (const char* s : LightContentWordsTableArr)
+            if (w == s) return true;
+        return false;
+    }
+
+    // words after which have/has/had is a main verb rather than an auxiliary
+    static const char* const MainVerbHaveCueArr[] = {
+        "A", "AN", "THE", "MY", "YOUR", "HIS", "HER", "ITS", "OUR", "THEIR",
+        "THIS", "THAT", "THESE", "THOSE", "SOME", "ANY", "NO", "MANY",
+        "MUCH", "ENOUGH", "LOTS", "TO",
+    };
+
+    // content/function/light classification for one word of a span
+    static void ClassifyWord(const std::vector<std::string>& ctxWords, int32_t idx,
+                             const std::string& wordLower, bool& isContent, bool& isLight) {
+        isContent = !IsFunctionWord(wordLower);
+        isLight = isContent && IsLightContentWord(wordLower);
+        if (!isContent && (wordLower == "have" || wordLower == "has" || wordLower == "had")
+            && idx + 1 < (int32_t)ctxWords.size()) {
+            for (const char* cue : MainVerbHaveCueArr) {
+                if (ctxWords[idx + 1] == cue) {
+                    isContent = true;
+                    break;
+                }
+            }
+        }
+    }
+
     static bool IsPronounWord(const std::string& w) {
         for (const char* s : PronounWordsTableArr)
             if (w == s) return true;
@@ -1383,9 +1429,10 @@ namespace SharpVox {
                 }
                 std::string wordLower = word;
                 for (char& c : wordLower) { c = (char)std::tolower((unsigned char)c); }
-                AppendWordTokens(tokens, stream,
-                    !IsFunctionWord(wordLower),
-                    IsPronounWord(wordLower));
+                bool isContent, isLight;
+                ClassifyWord(ctxWords, wordIdx, wordLower, isContent, isLight);
+                AppendWordTokens(tokens, stream, isContent,
+                    IsPronounWord(wordLower), isLight);
                 wordIdx++;
             } else if (t.kind == TokKind::Hiragana) {
                 auto jptoks = JapaneseParser::SpanToPhonemes(normalized, t.pos, t.len);
@@ -1454,7 +1501,8 @@ namespace SharpVox {
                     std::string word = normalized.substr(t.pos, t.len);
                     std::string wordLower = word;
                     for (char& c : wordLower) { c = (char)std::tolower((unsigned char)c); }
-                    bool isContent = !IsFunctionWord(wordLower);
+                    bool isContent, isLight;
+                    ClassifyWord(ctxWords, wordIdx, wordLower, isContent, isLight);
                     auto stream = HeteronymResolver::Resolve(ctxWords, wordIdx);
                     if (stream.empty()) {
                         std::string upper = word;
@@ -1462,7 +1510,7 @@ namespace SharpVox {
                         stream = WordToPhonStream(upper);
                     }
                     AppendWordTokens(tokens, stream, isContent,
-                        IsPronounWord(wordLower));
+                        IsPronounWord(wordLower), isLight);
                     wordIdx++;
                 } else if (t.kind == TokKind::Hiragana) {
                     auto jptoks = JapaneseParser::SpanToPhonemes(normalized, t.pos, t.len);
@@ -1667,9 +1715,9 @@ namespace SharpVox {
     // Stream -> PhonemeToken list
 
     void Phonemizer::AppendWordTokens(std::vector<PhonemeToken>& tokens, const std::vector<uint8_t>& stream,
-                                      bool isContent, bool isPronoun) {
+                                      bool isContent, bool isPronoun, bool isLight) {
         int64_t pending = 0;
-        int64_t persistent = isPronoun ? kPronounWord : 0LL;
+        int64_t persistent = (isPronoun ? kPronounWord : 0LL) | (isLight ? kLightContent : 0LL);
         size_t startIdx = tokens.size();
         bool hadPrimary = false;
 

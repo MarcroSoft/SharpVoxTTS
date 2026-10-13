@@ -80,6 +80,9 @@ namespace SharpVox {
             _vpFujiFinalDropPitch = (int32_t)(std::log(1.0 - dropFrac) * kPitchUnitsPerNeper);
         }
 
+        // clauses after a comma sit lower carrying declination across the sentence instead of recentering each clause on the same mean
+        _clauseLevel = kContinuationClauseLevel * std::min<int32_t>(s.ClauseInSentence, 2);
+
         _fuji.Reset();
         _punctSmooth = 0;
         _f0Smooth = 0;
@@ -102,8 +105,12 @@ namespace SharpVox {
         BuildFujiProsody();
 
         // Fire the clause-start phrase command; kPhraseReset re-fires it mid-clause
-        _fuji.Phrase((double)_vpFujiPhraseAmp / k100percent,
-                     FujisakiPitchModel::kDefaultPhraseLenFrames);
+        FirePhraseCommand();
+    }
+
+    // fires the clause phrase command
+    void PitchInterpolator::FirePhraseCommand() {
+        _fuji.Phrase((double)_vpFujiPhraseAmp / k100percent, kPhraseLenFrames);
     }
 
     int16_t PitchInterpolator::Step() {
@@ -310,8 +317,7 @@ namespace SharpVox {
                     _downRampStep = _rampSteps[_curRamp];
                     // Fresh phrase command; filters start from rest
                     _fuji.Reset();
-                    _fuji.Phrase((double)_vpFujiPhraseAmp / k100percent,
-                                 FujisakiPitchModel::kDefaultPhraseLenFrames);
+                    FirePhraseCommand();
                     _phraseFireFrame = _clauseFrame;
                     _punctSmooth = 0;
                     _f0Smooth = 0;
@@ -437,8 +443,7 @@ namespace SharpVox {
             int32_t voicedCount = 0;
             if (totalFrames > 0) {
                 _fuji.Reset();
-                _fuji.Phrase((double)_vpFujiPhraseAmp / k100percent,
-                             FujisakiPitchModel::kDefaultPhraseLenFrames);
+                FirePhraseCommand();
                 int32_t phonIdx = 0;
                 for (int32_t f = 0; f < totalFrames; ++f) {
                     FirePitchEvents();
@@ -505,11 +510,24 @@ namespace SharpVox {
         // accents stay near-nuclear so the clause doesn't ride flat.
         double amp = 0.0;
         double prominence = 1.0;
+        const bool japanese = (GetPhonCtrl(phon) & kJapaneseMora) != 0;
+        const bool nuclear = (flags & kPitchRiseFall_Flg) != 0 && !japanese;
         if ((flags & kPitchRiseFall_Flg) != 0) {
             amp = (double)_vpFujiPrimaryAccentAmp / k100percent;
+            // yes/no questions have low nuclear accent (L*) ahead of the final rise
+            if (nuclear && _plan.EndPunctuation == _Quest_) {
+                amp *= kQuestionNuclearScale;
+            }
         } else if ((flags & kPitchRiseFall1_Flg) != 0) {
             amp = (double)_vpFujiHeadAccentAmp / k100percent;
             prominence = 0.85;
+            // graded head accents, light content words and single-syllable words are accented more weakly
+            if ((GetPhonCtrl(phon) & kLightContent) != 0) {
+                amp *= kLightContentAccentScale;
+            }
+            if (phon >= 0 && phon < (int32_t)_wordNuclei.size() && _wordNuclei[phon] == 1) {
+                amp *= kMonosyllableAccentScale;
+            }
         } else if ((flags & kPitchStress_Flg) != 0) {
             // Emphatic vs pronoun accent, told apart via the phoneme's controls
             int64_t ctrl = GetPhonCtrl(phon);
@@ -560,9 +578,12 @@ namespace SharpVox {
         // Pulse length = vowel duration, clamped to a window (minimum so short
         // vowels drive the filter; the tail links accents together), scaled for
         // single-nucleus words.
-        int32_t dur = durationFrames;
-        if (dur < kMinAccentPulseFrames) dur = kMinAccentPulseFrames;
-        if (dur > kMaxAccentPulseFrames) dur = kMaxAccentPulseFrames;
+        // nuclear pulses run slightly past the vowel so the fall lands on the following material.
+        int32_t dur = nuclear ? (int32_t)(durationFrames * kNuclearPulseScale) : durationFrames;
+        int32_t pMin = japanese ? kJapaneseMinPulseFrames : kMinAccentPulseFrames;
+        int32_t pMax = japanese ? kJapaneseMaxPulseFrames : kMaxAccentPulseFrames;
+        if (dur < pMin) dur = pMin;
+        if (dur > pMax) dur = pMax;
         if (_vpFujiMonoAccentDurScale > 0.0 && _vpFujiMonoAccentDurScale < 1.0
             && phon >= 0 && phon < (int32_t)_wordNuclei.size()
             && _wordNuclei[phon] == 1) {
@@ -627,7 +648,7 @@ namespace SharpVox {
             // Scale around the clause mean so PitchHz stays the average pitch;
             // phoneme micro-features are applied after range scaling to stay
             // constant regardless of the pitch range setting.
-            int32_t totalOffset = (int32_t)(((int64_t)(intonBase - _fujiMeanOffset) * _vpIntonation) >> 16);
+            int32_t totalOffset = (int32_t)(((int64_t)(intonBase - _fujiMeanOffset + _clauseLevel) * _vpIntonation) >> 16);
             totalOffset = (int16_t)totalOffset; // preserve C short-truncation behaviour
             _dbgTotalOffset = totalOffset;
             _controlF0 = (int32_t)((((int64_t)totalOffset * _vpPitchRange) >> 16) + _vpBaselinePitch);
