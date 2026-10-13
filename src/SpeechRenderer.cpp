@@ -362,7 +362,7 @@ void SpeechRenderer::InterpolateControls() {
 // parameters; scaling all three formants by a constant factor approximates the
 // effect of a shorter or longer vocal tract while preserving inter-formant
 // relationships. Minimum inter-formant separations (F2-F1 >= 200 Hz,
-// F3-F2 >= 600 Hz) prevent resonator crossing and the spectral artifacts that
+// F3-F2 >= 300 Hz) prevent resonator crossing and the spectral artifacts that
 // result from pole-zero near-cancellations.
 //
 // Bandwidths are gain-scaled per voice. Klatt & Klatt (1990) show that formant
@@ -383,7 +383,8 @@ Frame SpeechRenderer::SaveFrame(int16_t f0, uint8_t phonCtrl) {
     while (curF2 - curF1 < 200) {
         curF1 -= 10;
     }
-    while (curF3 - curF2 < 600) {
+    // rhotics bring F3 to within ~300 Hz of F2
+    while (curF3 - curF2 < kMinF3F2Separation) {
         curF3 += 10;
     }
 
@@ -960,6 +961,12 @@ void SpeechRenderer::InitCtrlsForNewPhon() {
                     if ((_curPhonCtrl & kStressField) != 0) {
                         u *= kStressedScale;
                     }
+                    // unstressed er stays r colored in American English, keep the
+                    // F2/F3 of rhotic vowels out of the undershoot pull
+                    if ((_curBlockIndex == kF2 || _curBlockIndex == kF3) &&
+                        (_curPhon == _ER_ || (_curPhon >= _IR_ && _curPhon <= _UR_))) {
+                        u = 0.0f;
+                    }
                     int32_t uq = (int32_t)(u * 65536.0f);
                     // Coarticulatory undershoot toward the adjacent-segment locus.
                     cb.curP_START_Targ += (int16_t)((locusMid - cb.curP_START_Targ) * uq >> 16);
@@ -1023,6 +1030,12 @@ void SpeechRenderer::InitCtrlsForNewPhon() {
         // nucleus instead of blurring (AH -> EH) or snapping through a halfway shape.
         // Vowel frequency blocks only; consonant place transitions are untouched.
         if (bt == kFreqType && (_curPhonFlags & kVowelF) != 0) {
+            // cap each formant ramp at kMaxTransPct of the vowel at every rate
+            int32_t cap = (_curPhonDur * kMaxTransPct) / 100;
+            if (cap < 1) cap = 1;
+            if (headTime > cap) headTime = cap;
+            if (tailTime > cap) tailTime = cap;
+
             // Full excursion at/above kRefDurFrames; below it scale down, floored.
             constexpr int32_t kRefDurFrames = 12;                // ~60ms at 5ms/frame
             constexpr int32_t kMinScaleQ16  = (65536 * 30) / 100;

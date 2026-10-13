@@ -31,6 +31,9 @@ public:
     static constexpr int32_t kAp2 = 9; static constexpr int32_t kAp3 = 10; static constexpr int32_t kAp4 = 11;
     static constexpr int32_t kAp5 = 12; static constexpr int32_t kAp6 = 13; static constexpr int32_t kAB = 14;
 
+    // minimum F3-F2 separation in SaveFrame
+    static constexpr int32_t kMinF3F2Separation = 300;
+
     // Voicing table cut for nasal murmur (table units, ~0.5 dB each) so nasals dip below neighbouring vowels, pause-final nasals and syllabic EN take a lighter cut.
     static constexpr int16_t kNasalVoicingCut = 16;
     static constexpr int16_t kFinalNasalVoicingCut = 8;
