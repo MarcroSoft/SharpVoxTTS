@@ -71,7 +71,7 @@ WASM_SRCS := $(LIB_SRCS) \
 
 WASM_OUT  := platform/wasm/wwwroot/js/sharpvox.js
 
-EMCC      := emcc
+EMCC      := em++
 EMCCFLAGS := -std=c++17 -O2 -Iinclude -DSHARPVOX_SAMPLED_GLOT -DHAVE_MECAB \
     --bind \
     -fwasm-exceptions \
