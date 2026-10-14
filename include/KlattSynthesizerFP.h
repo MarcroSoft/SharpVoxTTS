@@ -163,6 +163,19 @@ namespace SharpVox {
         int32_t _preemphScale_q12;  // fs/22050 in Q12, flattens differentiator gain across rates
         float _tiltPrev;        // spectral tilt one-sample delay (float, matches float variant)
 
+        // breath (BreathAmt) shaping
+        static constexpr float kBreathTilt        = 0.95f;   // first difference pre emphasis
+        static constexpr float kBreathHighShift   = 5500.0f; // Hz added to each formant
+        static constexpr float kBreathHighBwMul   = 3.0f;    // bank bandwidth = formant BW x this
+        static constexpr float kBreathHighBwMin   = 600.0f;  // Hz
+        static constexpr float kBreathHighGain    = 0.0015f; // bank level re the cascade breath
+        static constexpr float kBreathHighDecay   = 0.9f;    // per resonator gain step (F1 copy strongest)
+        struct BreathBand { float b0, b2, a1, a2, z1, z2, gain; };
+        BreathBand _breathBank[5];
+        int32_t _breathBankN;
+        float _breathPrev;      // pre-emphasis delay
+        float _breathExc;       // this sample's gated breath excitation for the bank
+
         //  Amplitude state: Q8 (float * 256) 
         int32_t _voiceAmp_q8;
         int32_t _fricAmp_q8;
