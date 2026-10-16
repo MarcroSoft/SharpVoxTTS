@@ -33,6 +33,8 @@ namespace SharpVox {
     // Forced clause-split threshold for unpunctuated run-ons (see TextToSentenceTokens).
     static const int32_t kMaxClauseWords = 96;
 
+    static const char kSubwordJoin = '\x01';
+
     // Subject pronouns: receive kPronounWord on every phoneme so the backend can
     // apply vocal-confidence emphasis (pitch accent + vowel lengthening).
     static const char* const PronounWordsTableArr[] = {
@@ -802,7 +804,7 @@ namespace SharpVox {
             if (i > 0 && std::isupper((unsigned char)c)) {
                 bool nextLower = (i + 1 < text.size()) && std::islower((unsigned char)text[i + 1]);
                 if (nextLower) {
-                    result += ' ';
+                    result += kSubwordJoin;
                 }
             }
             result += c;
@@ -1108,7 +1110,7 @@ namespace SharpVox {
                     if (s.compare(i, k, s, i + r * k, k) != 0) match = false;
                 if (!match) continue;
                 for (size_t r = 0; r < reps; ++r) {
-                    if (r > 0) out += ' ';
+                    if (r > 0) out += kSubwordJoin;
                     out.append(s, i, k);
                 }
                 i = wEnd;
@@ -1137,9 +1139,9 @@ namespace SharpVox {
                 size_t start = i;
                 while (i < n && std::isdigit((unsigned char)s[i])) ++i;
                 out.push_back({TokKind::Digits, (uint32_t)start, (uint32_t)(i - start)});
-            } else if (std::isalpha(c)) {
+            } else if (std::isalpha(c) || c == kSubwordJoin) {
                 size_t start = i;
-                while (i < n && std::isalpha((unsigned char)s[i])) ++i;
+                while (i < n && (std::isalpha((unsigned char)s[i]) || s[i] == kSubwordJoin)) ++i;
                 while (i < n && s[i] == '\'' &&
                        i + 1 < n && std::isalpha((unsigned char)s[i + 1])) {
                     ++i;
@@ -1544,11 +1546,15 @@ namespace SharpVox {
     std::vector<uint8_t> Phonemizer::SpellOutAcronym(const std::string& upper) {
         std::vector<uint8_t> buf;
         buf.reserve(upper.size() * 4);
+        bool firstLetter = true;
         for (char c : upper) {
             if (c < 'A' || c > 'Z') {
                 continue;
             }
-            buf.push_back(OP_WORD);
+            if (firstLetter) {
+                buf.push_back(OP_WORD);
+                firstLetter = false;
+            }
             const auto& entry = LetterPhonemesTable[c - 'A'];
             for (size_t k = 0; k < entry.len; k++) {
                 buf.push_back(entry.data[k]);
@@ -1570,6 +1576,24 @@ namespace SharpVox {
     }
 
     std::vector<uint8_t> Phonemizer::WordToPhonStream(const std::string& upperWord) {
+        if (upperWord.find(kSubwordJoin) != std::string::npos) {
+            std::vector<uint8_t> out;
+            size_t p = 0;
+            bool firstPiece = true;
+            while (p < upperWord.size()) {
+                size_t e = upperWord.find(kSubwordJoin, p);
+                if (e == std::string::npos) { e = upperWord.size(); }
+                std::string piece = upperWord.substr(p, e - p);
+                p = e + 1;
+                if (piece.empty()) { continue; }
+                std::vector<uint8_t> piecePhons = WordToPhonStream(piece);
+                if (!firstPiece && !piecePhons.empty()) { piecePhons.erase(piecePhons.begin()); }
+                out.insert(out.end(), piecePhons.begin(), piecePhons.end());
+                firstPiece = false;
+            }
+            return out;
+        }
+
         // Contractions are stored in the dict without apostrophes ("ISN'T" -> "ISNT").
         std::string lookupWord = upperWord;
         if (lookupWord.find('\'') != std::string::npos) {
