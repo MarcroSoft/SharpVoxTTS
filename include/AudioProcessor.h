@@ -188,9 +188,9 @@ namespace SharpVox {
         int32_t  _phonBuf2InIndex;
         int32_t  _pitchBufInIndex;
         int32_t  _scanIndex;
-        bool     _isCompoundNoun;
-        int16_t  _endPunctuation;
-        bool     _singing;
+        bool     _isCompoundNoun = false;
+        int16_t  _endPunctuation = _Period_;
+        bool     _singing = false;
         // clauses already spoken in the current sentence
         // 0 for a sentence initial clause
         int16_t  _clauseInSentence = 0;

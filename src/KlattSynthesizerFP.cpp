@@ -958,6 +958,7 @@ void KlattSynthesizerFP::SynthesizeFrame(Frame frame, int16_t* outputBuffer, int
 
         } else {
             _glotPhase=0; _chorusPhase=0;
+            _preemphPrev = 0;
             outputBuffer[offset++] = 0;
         }
     }
