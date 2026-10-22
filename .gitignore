@@ -3,7 +3,8 @@
 *.d
 *.a
 *.so
-sharpvox
+/sharpvox
+# stale dll artifact that lands in the tracked NVDA driver dir
 tests/dump_stages
 tests/midi_timing_probe
 out.wav
@@ -15,3 +16,20 @@ platform/wasm/wwwroot/js/sharpvox.js
 platform/wasm/wwwroot/js/sharpvox.wasm
 hello_world
 hello.wav
+
+# NVDA addon build artifacts
+platform/nvda/*.dll
+platform/nvda/build*/
+platform/nvda/synthDrivers/sharpvox/*.dll
+*.nvda-addon
+
+# Platform artifacts
+build/
+.gradle/
+.cxx/
+.externalNativeBuild/
+.pio/
+.idea/
+local.properties
+*.apk
+*.aab

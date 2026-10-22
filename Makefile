@@ -1,6 +1,6 @@
 CXX      := g++
 # -MMD -MP emits .d header dependency files so edits to include/ trigger rebuilds
-CXXFLAGS := -std=c++11 -O2 -Wall -Wextra -Iinclude -fPIC -DSHARPVOX_FIXED_POINT_SYNTH -MMD -MP
+CXXFLAGS := -std=c++11 -O2 -Wall -Wextra -Iinclude -fPIC -MMD -MP
 LDFLAGS  :=
 LDLIBS   := -lm
 
@@ -8,10 +8,11 @@ UNAME := $(shell uname)
 CLI_CXXFLAGS := $(CXXFLAGS)
 CLI_LDLIBS   := $(LDLIBS)
 
+HAVE_MECAB ?= 1
+
 # Library sources (all files shared by both targets)
 LIB_SRCS := \
     src/Tables.cpp \
-    src/KlattSynthesizer.cpp \
     src/KlattSynthesizerFP.cpp \
     src/PitchInterpolator.cpp \
     src/AudioProcessor.cpp \
@@ -28,6 +29,11 @@ LIB_SRCS := \
     src/KlattschParser.cpp \
     src/VoicePresets.cpp \
     src/JapaneseParser.cpp
+
+ifeq ($(HAVE_MECAB),1)
+LIB_SRCS += src/MeCabReader.cpp src/IpadicDict.cpp src/IpadicData.cpp
+CXXFLAGS += -DHAVE_MECAB
+endif
 
 LIB_OBJS := $(LIB_SRCS:.cpp=.o)
 
@@ -65,8 +71,8 @@ WASM_SRCS := $(LIB_SRCS) \
 
 WASM_OUT  := platform/wasm/wwwroot/js/sharpvox.js
 
-EMCC      := emcc
-EMCCFLAGS := -std=c++17 -O2 -Iinclude -DSHARPVOX_FIXED_POINT_SYNTH -DSHARPVOX_SAMPLED_GLOT \
+EMCC      := em++
+EMCCFLAGS := -std=c++17 -O2 -Iinclude -DSHARPVOX_SAMPLED_GLOT -DHAVE_MECAB \
     --bind \
     -fwasm-exceptions \
     -sALLOW_MEMORY_GROWTH=1 \
@@ -109,7 +115,7 @@ $(ARCHIVE): $(LIB_OBJS)
 platform/cli/%.o: platform/cli/%.cpp
 	$(CXX) $(CLI_CXXFLAGS) -c $< -o $@
 
-# Pattern rule: compile .cpp → .o (applies to src/, platform/lib/)
+# Pattern rule: compile .cpp -> .o (applies to src/, platform/lib/)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -120,7 +126,8 @@ platform/lib/%.o: platform/lib/%.cpp
 -include $(LIB_OBJS:.o=.d) $(CLI_OBJS:.o=.d) $(SHLIB_OBJS:.o=.d)
 
 wasm:
-	$(EMCC) $(EMCCFLAGS) $(WASM_SRCS) -o $(WASM_OUT)
+	$(EMCC) $(EMCCFLAGS) $(WASM_SRCS) \
+		-o $(WASM_OUT)
 
 wasm-host: wasm
 	python3 -m http.server 8080 --directory platform/wasm/wwwroot

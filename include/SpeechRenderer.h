@@ -8,12 +8,12 @@
 #include "../include/SynthData.h"
 #include "../include/VoiceData.h"
 #include "../include/Tables.h"
-#include "../include/KlattSynthesizer.h"
+#include "../include/Frame.h"
 #include "../include/PitchInterpolator.h"
 
 namespace SharpVox {
 
-// Converts phonemes into KlattSynthesizer frames using Klatt (1980) and Klatt & Klatt (1990) models.
+// Converts phonemes into KlattSynthesizerFP frames using Klatt (1980) and Klatt & Klatt (1990) models.
 //
 // Parallel control blocks with HEAD and TAIL ramps ensure continuous parameter trajectory blending.
 //
@@ -30,6 +30,14 @@ public:
     static constexpr int32_t kFNZ = 6; static constexpr int32_t kAV = 7;  static constexpr int32_t kAF = 8;
     static constexpr int32_t kAp2 = 9; static constexpr int32_t kAp3 = 10; static constexpr int32_t kAp4 = 11;
     static constexpr int32_t kAp5 = 12; static constexpr int32_t kAp6 = 13; static constexpr int32_t kAB = 14;
+
+    // minimum F3-F2 separation in SaveFrame
+    static constexpr int32_t kMinF3F2Separation = 300;
+
+    // Voicing table cut for nasal murmur (table units, ~0.5 dB each) so nasals dip below neighbouring vowels, pause-final nasals and syllabic EN take a lighter cut.
+    static constexpr int16_t kNasalVoicingCut = 16;
+    static constexpr int16_t kFinalNasalVoicingCut = 8;
+    static constexpr int16_t kSyllabicNasalVoicingCut = 10;
 
     // Block type constants (match Tables.ControlBlockTypeTable)
     static constexpr int32_t kFreqType = 0;    static constexpr int32_t kBWType = 1;

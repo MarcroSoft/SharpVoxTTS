@@ -20,8 +20,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
 
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
         -std=c++17
-        -DSHARPVOX_FIXED_POINT_SYNTH
         -DNO_FILESYSTEM
+        -DHAVE_MECAB
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME}

@@ -6,7 +6,8 @@
 namespace SharpVox {
 
 struct VoiceData {
-    int16_t PitchHz = 208;
+    // Baseline pitch; JSON voice presets override this.
+    int16_t PitchHz = 104;  // 208 was an octave high (pre-HzToPitch-fix tuning)
     float TractScale = 1.0f;
     int16_t PitchRange = 120;
     int16_t StressGain = 60;
@@ -38,12 +39,6 @@ struct VoiceData {
     int16_t F4BW = 650;
     int16_t F5Freq = 4000;
     int16_t F5BW = 750;
-    int16_t F4pFreq = 3650;
-    int16_t F4pBW = 150;
-    int16_t F5pFreq = 4200;
-    int16_t F5pBW = 100;
-    int16_t F6pFreq = 6000;
-    int16_t F6pBW = 700;
 
     int16_t NasalBase = 330;
     int16_t NasalTarg = 400;
@@ -82,6 +77,18 @@ struct VoiceData {
     int16_t VibratoFreqRaw = 65; // 6.5hz
     int16_t Intonation = 100;
 
+    // Fujisaki intonation model (replaces Taylor-tilt).  Command amplitudes
+    // are log-F0 (neper) units; Q16 = 16.16 fixed.
+    int32_t FujisakiPhraseAmpQ16           = (int32_t)(0.19 * 65536);  // phrase command amplitude
+    int32_t FujisakiPrimaryAccentAmpQ16    = (int32_t)(0.18 * 65536);  // nuclear / primary-stress accent
+    int32_t FujisakiHeadAccentAmpQ16       = (int32_t)(0.17 * 65536);  // pre-nuclear head accent (L+H*/H*)
+    int32_t FujisakiSecondaryAccentAmpQ16  = (int32_t)(0.12 * 65536);  // pronoun / light stress accent
+    int32_t FujisakiEmphaticAccentAmpQ16   = (int32_t)(0.30 * 65536);  // emphatic-stress accent
+    int16_t FujisakiPitchCurveExpPct       = 100;   // prominence shaping exponent (100 = 1.0)
+    int16_t FujisakiMonoAccentDurScalePct  = 100;   // mono-syllable accent duration scale (100 = 1.0)
+    int32_t FujisakiCompoundStepQ16        = 0;     // secondary-after-primary step-down (nepers)
+    int16_t FujisakiFinalDropPct           = 19;    // statement final-vowel drop (19 -> end ~0.81x)
+
     int16_t UptalkAmt = 0;        // 0-100: sentence-final rising tendency (0=natural fall, 100=strong uptalk/rise)
     int16_t StressEarly = 0;      // -50 to +50: stress peak alignment (-50=early/assertive, 0=natural, +50=late/hesitant)
     int16_t BreakStrength = 50;   // 0-100: phrase boundary reset strength (0=smooth carry-over, 50=natural, 100=hard reset)
@@ -104,7 +111,6 @@ struct VoiceData {
         v.F4BW = 50;
         v.F5Freq = 4500;
         v.F5BW = 250;
-        v.F4pFreq = 4500;
         v.BwGain1 = 100;
         v.BwGain3 = 50;
         v.NGain = 200;

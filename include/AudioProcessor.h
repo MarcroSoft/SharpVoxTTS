@@ -90,11 +90,22 @@ namespace SharpVox {
         static constexpr int32_t kHZ_25 = 649 - kNormalPitch;  // 70
         static constexpr int32_t kHZ_28 = 656 - kNormalPitch;  // 77
 
+        // accent and boundary tone placement,  Onsets are frames relative to the vowel start
+        // accent commands lead the stressed vowel by 15-20 ms
+        static constexpr int16_t kHeadAccentOnset    = -3;
+        static constexpr int16_t kNuclearAccentOnset = -4;
+        // boundary tone targets in pitch units, yes/no question rise
+        // start end and comma continuation rise.
+        static constexpr int16_t kQuestRiseStart = 39;
+        static constexpr int16_t kQuestRiseEnd   = 85;
+        static constexpr int16_t kContRiseStart  = 20;
+        static constexpr int16_t kContRiseEnd    = 57;
+
         // Working buffers  sized per-call to actual clause length in Process().
         // Buf1: raw phoneme stream from the front-end (LoadPhonemes).
         // Buf2: allophone-transformed stream (FillPhonBuf2).  Allocated at 2 buf1
         //       capacity to absorb any glottal-stop / plosive-release insertions.
-        // PitchBuf: Tilt events (FillPitchBuf).  Allocated at 6 buf1 capacity.
+        // PitchBuf: prosody events (FillPitchBuf) for PitchInterpolator.  6 buf1.
         // RampSteps: baseline declination steps across phrase resets.  Fixed at
         //            kMaxRamps because that bound is independent of clause length.
         std::vector<int16_t>  _phonBuf1;
@@ -161,14 +172,29 @@ namespace SharpVox {
         int16_t  _vpEmphasisBoost;
         int32_t  _vocalConfidence;
 
+        // Fujisaki intonation model knobs (from VoiceData)
+        int64_t  _vpFujiPhraseAmp;            // Q16 nepers
+        int64_t  _vpFujiPrimaryAccentAmp;     // Q16 nepers
+        int64_t  _vpFujiHeadAccentAmp;        // Q16 nepers
+        int64_t  _vpFujiSecondaryAccentAmp;   // Q16 nepers
+        int64_t  _vpFujiEmphaticAccentAmp;    // Q16 nepers
+        int32_t  _vpFujiPitchCurveExpPct;
+        int32_t  _vpFujiMonoAccentDurScalePct;
+        int64_t  _vpFujiCompoundStep;         // Q16 nepers
+        int32_t  _vpFujiFinalDropPct;
+
         // State computed during pipeline
         int32_t  _phonBuf1InIndex;
         int32_t  _phonBuf2InIndex;
         int32_t  _pitchBufInIndex;
         int32_t  _scanIndex;
-        bool     _isCompoundNoun;
-        int16_t  _endPunctuation;
-        bool     _singing;
+        bool     _isCompoundNoun = false;
+        int16_t  _endPunctuation = _Period_;
+        bool     _singing = false;
+        // clauses already spoken in the current sentence
+        // 0 for a sentence initial clause
+        int16_t  _clauseInSentence = 0;
+        int16_t  _prevEndPunctuation = _Period_;
 
         // Rate params
         int64_t  _rateRatio;

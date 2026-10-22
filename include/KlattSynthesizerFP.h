@@ -1,7 +1,7 @@
 #ifndef SHARPVOX_KLATT_SYNTHESIZER_FP_H
 #define SHARPVOX_KLATT_SYNTHESIZER_FP_H
 
-// Fixed-point drop-in replacement for KlattSynthesizer.
+// Fixed-point Klatt (1980) formant synthesizer.
 // All per-sample IIR operations and modulation use integer arithmetic.
 // Coefficient computation (Calc_Pole_Coefficients) still uses float at frame
 // boundaries  that's negligible cost and keeps the math exact.
@@ -16,11 +16,8 @@
 //   Pink noise state:     int32_t Q15  (small values  50 max  1.6M, fits int32_t)
 //   Vibrato/tremolo phase: uint32_t [0, 1<<17) = [0, 2)
 //   Sin LUT:              int16_t Q15, 512 entries
-//
-// Enable by building with -DSHARPVOX_FIXED_POINT_SYNTH. TtsEngine.h/cpp use
-// #ifdef guards to swap KlattSynthesizerFP into the _synth member.
 
-#include "KlattSynthesizer.h"  // for Frame, HzToPitch/PitchToHz shared static helpers
+#include "Frame.h"  // Frame + pitch helpers
 
 #include <cstdint>
 #include <cmath>
@@ -31,19 +28,15 @@ namespace SharpVox {
 
     class KlattSynthesizerFP {
     public:
-        static constexpr int32_t KMaxBandWidth       = KlattSynthesizer::KMaxBandWidth;
-        static constexpr int32_t KPrecision          = KlattSynthesizer::KPrecision;
-        static constexpr int32_t KOnePtOh            = KlattSynthesizer::KOnePtOh;
-        static constexpr int32_t KNoiseGain          = KlattSynthesizer::KNoiseGain;
-        static constexpr int32_t KDefaultSampleRate  = KlattSynthesizer::KDefaultSampleRate;
-        static constexpr int32_t KDefaultSampFrameLen= KlattSynthesizer::KDefaultSampFrameLen;
+        static constexpr int32_t KMaxBandWidth       = 1225;
+        static constexpr int32_t KPrecision          = 13;
+        static constexpr int32_t KOnePtOh            = 0x2000;
+        static constexpr int32_t KNoiseGain          = 2500;
+        static constexpr int32_t KDefaultSampleRate  = 22050;
+        static constexpr int32_t KDefaultSampFrameLen= 112;
 
         int32_t SampleRate() const { return _sampleRate; }
         int32_t SampFrameLen;
-
-        // Delegate static helpers to the float version  identical math, no duplication.
-        static int16_t HzToPitch(int16_t hz)    { return KlattSynthesizer::HzToPitch(hz); }
-        static int16_t PitchToHz(int16_t pitch) { return KlattSynthesizer::PitchToHz(pitch); }
 
         int16_t VoiceChorus    = 0;
         int16_t Jitter         = 0;
@@ -170,6 +163,19 @@ namespace SharpVox {
         int32_t _preemphScale_q12;  // fs/22050 in Q12, flattens differentiator gain across rates
         float _tiltPrev;        // spectral tilt one-sample delay (float, matches float variant)
 
+        // breath (BreathAmt) shaping
+        static constexpr float kBreathTilt        = 0.95f;   // first difference pre emphasis
+        static constexpr float kBreathHighShift   = 5500.0f; // Hz added to each formant
+        static constexpr float kBreathHighBwMul   = 3.0f;    // bank bandwidth = formant BW x this
+        static constexpr float kBreathHighBwMin   = 600.0f;  // Hz
+        static constexpr float kBreathHighGain    = 0.0015f; // bank level re the cascade breath
+        static constexpr float kBreathHighDecay   = 0.9f;    // per resonator gain step (F1 copy strongest)
+        struct BreathBand { float b0, b2, a1, a2, z1, z2, gain; };
+        BreathBand _breathBank[5];
+        int32_t _breathBankN;
+        float _breathPrev;      // pre-emphasis delay
+        float _breathExc;       // this sample's gated breath excitation for the bank
+
         //  Amplitude state: Q8 (float * 256) 
         int32_t _voiceAmp_q8;
         int32_t _fricAmp_q8;
@@ -185,11 +191,9 @@ namespace SharpVox {
         int32_t _chorusPhase;
         int32_t _chorusPhaseInc;
         // Inline polynomial parameters (replace lookup tables — eliminates staircase quantization).
-        int32_t _Ne_fp;          // open-phase end in 24-bit phase units
-        int32_t _chorusNe_fp;
-        float   _glotInvNe_f;   // 1.0f / _Ne_fp
-        float   _chorusInvNe_f;
-        float   _voiceGain_f;   // vGain * 288.0f (matches float synth _lfGain)
+    int32_t _Ne_fp;          // open-phase end in 24-bit phase units
+    int32_t _chorusNe_fp;
+    float   _voiceGain_f;   // vGain * 288.0f (matches float synth _lfGain)
 
 #ifdef SHARPVOX_SAMPLED_GLOT
         std::vector<float> _sgBuf;     // resampled glottal source, normalised to max|x|=1
